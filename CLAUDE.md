@@ -57,7 +57,22 @@
 
 ---
 
-## 5. Ready Configuration Files
+## 5. Deployment & Vercel Automation (CRITICAL FOR CLAUDE)
+- **Repository Remote:** `origin` is mapped to `https://github.com/johnsolomonalt-tech/racinggame.git`.
+- **Branch:** `main` (tracked with upstream).
+- **Vercel Hook:** Vercel is connected to this repository. Pushing to `main` triggers an automatic edge deployment.
+- **Completion Protocol:**
+  Once you have built, tested (`npm run build`), and verified the racing game:
+  ```bash
+  git add .
+  git commit -m "feat: complete web 3d racing game implementation"
+  git push origin main
+  ```
+  This will immediately trigger Vercel to build and publish the live production URL.
+
+---
+
+## 6. Ready Configuration Files
 - [`vercel.json`](file:///Users/solomon/Downloads/racing%20game/vercel.json): Edge caching rules for `.glb`, `.gltf`, `.wasm`, `.png`, `.jpg`, `.hdr` files.
 - [`package.json`](file:///Users/solomon/Downloads/racing%20game/package.json): Prescribed versions of R3F, Rapier, Postprocessing, and Three.js.
 - [`vite.config.ts`](file:///Users/solomon/Downloads/racing%20game/vite.config.ts): Chunk-splitting for `three`, `r3f`, `rapier`, and `postprocessing` + asset inclusion.
