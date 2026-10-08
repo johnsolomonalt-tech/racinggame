@@ -1,0 +1,206 @@
+.hud-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 10;
+  user-select: none;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Top Stats Bar */
+.hud-top {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  display: flex;
+  gap: 16px;
+}
+
+.hud-card {
+  background: rgba(13, 16, 27, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 3px solid #00f0ff;
+  border-radius: 4px;
+  padding: 8px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.hud-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #8899aa;
+  text-transform: uppercase;
+}
+
+.hud-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.hud-value-accent {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 22px;
+  font-weight: 800;
+  color: #00f0ff;
+}
+
+/* Drift Points Display */
+.hud-drift {
+  position: absolute;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.hud-drift-score {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #a0aec0;
+  background: rgba(10, 14, 24, 0.6);
+  padding: 4px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hud-drift-score span {
+  color: #ff0077;
+  font-family: ui-monospace, monospace;
+}
+
+.hud-drift-combo {
+  font-family: ui-monospace, monospace;
+  font-size: 32px;
+  font-weight: 900;
+  color: #ff0077;
+  text-shadow: 0 0 16px rgba(255, 0, 119, 0.7);
+  animation: driftPop 0.2s ease-out;
+}
+
+@keyframes driftPop {
+  0% {
+    transform: scale(0.9);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Speedometer & Tachometer Gauge */
+.hud-gauge {
+  position: absolute;
+  bottom: 32px;
+  right: 32px;
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gauge-dial {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16, 22, 36, 0.9) 60%, rgba(20, 28, 48, 0.6) 100%);
+  border: 2px solid rgba(0, 240, 255, 0.3);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gauge-needle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 58px;
+  background: #ff0077;
+  box-shadow: 0 0 8px #ff0077;
+  transform-origin: bottom center;
+  margin-top: -58px;
+  margin-left: -1.5px;
+  transition: transform 0.05s linear;
+  will-change: transform;
+}
+
+.gauge-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+}
+
+.gear-display {
+  font-size: 16px;
+  font-weight: 800;
+  color: #00f0ff;
+  background: rgba(0, 240, 255, 0.15);
+  border-radius: 4px;
+  padding: 1px 8px;
+  margin-bottom: 2px;
+}
+
+.speed-digits {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 40px;
+  font-weight: 900;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.speed-unit {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #8899aa;
+  margin-top: 2px;
+}
+
+.rpm-bar-container {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.rpm-bar {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #00f0ff 60%, #ff0077 90%);
+  transform-origin: left center;
+  transform: scaleX(0.2);
+  transition: transform 0.05s linear;
+  will-change: transform;
+}
+
+.hud-controls-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(10, 14, 24, 0.5);
+  padding: 4px 14px;
+  border-radius: 12px;
+  letter-spacing: 0.05em;
+}

@@ -17,8 +17,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           three: ['three'],
-          r3f: ['@react-three/fiber', '@react-three/drei'],
-          rapier: ['@react-three/rapier'],
+          'r3f-physics': ['@react-three/fiber', '@react-three/drei', '@react-three/rapier'],
           postprocessing: ['@react-three/postprocessing', 'postprocessing'],
         },
       },
