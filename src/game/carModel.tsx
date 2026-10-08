@@ -298,6 +298,27 @@ export function standardizeMaterials(root: THREE.Object3D) {
   });
 }
 
+function isolateWheel(wheelObj: THREE.Object3D): { pivot: THREE.Group; center: THREE.Vector3; radius: number } {
+  const pivot = new THREE.Group();
+  wheelObj.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(wheelObj);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const radius = Math.max(0.25, Math.min(0.48, Math.min(size.y, size.z) / 2 || 0.35));
+
+  if (wheelObj.parent) {
+    wheelObj.parent.remove(wheelObj);
+  }
+
+  // Position wheel mesh relative to pivot center so it rotates cleanly
+  wheelObj.position.sub(center);
+  pivot.add(wheelObj);
+
+  return { pivot, center, radius };
+}
+
 /** Hook loading a manifest entry or falling back to the procedural car. */
 export function useResolvedCar(entry: CarManifestEntry | null): ResolvedCarModel {
   const gltf = useGLTF(entry && entry.file ? entry.file : '/cars/empty.glb', '/draco/', undefined, () => null);
@@ -310,33 +331,120 @@ export function useResolvedCar(entry: CarManifestEntry | null): ResolvedCarModel
     const cloned = gltf.scene.clone(true);
     standardizeMaterials(cloned);
 
-    let chassis: THREE.Object3D | null = null;
-    let wheelFL: THREE.Object3D | null = null;
-    let wheelFR: THREE.Object3D | null = null;
-    let wheelRL: THREE.Object3D | null = null;
-    let wheelRR: THREE.Object3D | null = null;
+    // 1. Auto-detect orientation and scale normalization
+    cloned.updateMatrixWorld(true);
+    const rawBox = new THREE.Box3().setFromObject(cloned);
+    const rawSize = new THREE.Vector3();
+    rawBox.getSize(rawSize);
+
+    // Handle Blender Z-up vs Y-up export
+    if (rawSize.y > rawSize.z * 1.25) {
+      cloned.rotation.x = -Math.PI / 2;
+      cloned.updateMatrixWorld(true);
+    }
+
+    // Scale normalization to realistic vehicle length (~4.6m)
+    const midBox = new THREE.Box3().setFromObject(cloned);
+    const midSize = new THREE.Vector3();
+    midBox.getSize(midSize);
+    const currentLength = Math.max(midSize.z, midSize.y);
+    if (currentLength < 3.0 || currentLength > 6.5) {
+      const targetLength = entry.id.includes('raptor') ? 5.8 : 4.6;
+      const s = targetLength / currentLength;
+      cloned.scale.set(s, s, s);
+      cloned.updateMatrixWorld(true);
+    }
+
+    // 2. Identify wheel sub-meshes
+    let rawFL: THREE.Object3D | null = null;
+    let rawFR: THREE.Object3D | null = null;
+    let rawRL: THREE.Object3D | null = null;
+    let rawRR: THREE.Object3D | null = null;
 
     cloned.traverse((child) => {
       const n = child.name;
-      if (!wheelFL && matchesAlias(n, WHEEL_ALIASES.fl)) wheelFL = child;
-      else if (!wheelFR && matchesAlias(n, WHEEL_ALIASES.fr)) wheelFR = child;
-      else if (!wheelRL && matchesAlias(n, WHEEL_ALIASES.rl)) wheelRL = child;
-      else if (!wheelRR && matchesAlias(n, WHEEL_ALIASES.rr)) wheelRR = child;
-      else if (!chassis && (matchesAlias(n, ['chassis', 'body', 'car_body']) || child === cloned)) {
-        chassis = child;
-      }
+      if (!rawFL && matchesAlias(n, WHEEL_ALIASES.fl)) rawFL = child;
+      else if (!rawFR && matchesAlias(n, WHEEL_ALIASES.fr)) rawFR = child;
+      else if (!rawRL && matchesAlias(n, WHEEL_ALIASES.rl)) rawRL = child;
+      else if (!rawRR && matchesAlias(n, WHEEL_ALIASES.rr)) rawRR = child;
     });
 
-    // If wheels weren't split in the source, use procedural wheels as fallback
+    // 3. Center chassis container at ground level (bottom at Y=0, X=0, Z=0)
+    const centeredBox = new THREE.Box3().setFromObject(cloned);
+    const currentCenter = new THREE.Vector3();
+    centeredBox.getCenter(currentCenter);
+
+    const chassisContainer = new THREE.Group();
+    cloned.position.set(-currentCenter.x, -centeredBox.min.y, -currentCenter.z);
+    chassisContainer.add(cloned);
+    chassisContainer.updateMatrixWorld(true);
+
+    // 4. Derive accurate physical hitbox from normalized chassis
+    const finalBox = new THREE.Box3().setFromObject(chassisContainer);
+    const finalSize = new THREE.Vector3();
+    finalBox.getSize(finalSize);
+    const finalCenter = new THREE.Vector3();
+    finalBox.getCenter(finalCenter);
+
+    const hitbox = {
+      halfExtents: [
+        Math.max(0.75, finalSize.x * 0.46),
+        Math.max(0.35, finalSize.y * 0.45),
+        Math.max(1.6, finalSize.z * 0.48),
+      ] as [number, number, number],
+      center: [0, Math.max(0.4, finalCenter.y), 0] as [number, number, number],
+    };
+
+    // 5. Isolate or fallback wheels
     const fallback = buildProceduralCar();
+    const wheelRadius = entry.wheels?.radius || 0.35;
+
+    let wheelFL: THREE.Object3D;
+    let wheelFR: THREE.Object3D;
+    let wheelRL: THREE.Object3D;
+    let wheelRR: THREE.Object3D;
+
+    const wheelPositions = {
+      fl: [-hitbox.halfExtents[0] * 0.92, wheelRadius, -hitbox.halfExtents[2] * 0.65] as [number, number, number],
+      fr: [hitbox.halfExtents[0] * 0.92, wheelRadius, -hitbox.halfExtents[2] * 0.65] as [number, number, number],
+      rl: [-hitbox.halfExtents[0] * 0.92, wheelRadius, hitbox.halfExtents[2] * 0.65] as [number, number, number],
+      rr: [hitbox.halfExtents[0] * 0.92, wheelRadius, hitbox.halfExtents[2] * 0.65] as [number, number, number],
+    };
+
+    if (rawFL && rawFR && rawRL && rawRR) {
+      const flData = isolateWheel(rawFL);
+      const frData = isolateWheel(rawFR);
+      const rlData = isolateWheel(rawRL);
+      const rrData = isolateWheel(rawRR);
+
+      wheelFL = flData.pivot;
+      wheelFR = frData.pivot;
+      wheelRL = rlData.pivot;
+      wheelRR = rrData.pivot;
+
+      // Adjust positions with chassis offset
+      wheelPositions.fl = [flData.center.x - currentCenter.x, flData.center.y - centeredBox.min.y, flData.center.z - currentCenter.z];
+      wheelPositions.fr = [frData.center.x - currentCenter.x, frData.center.y - centeredBox.min.y, frData.center.z - currentCenter.z];
+      wheelPositions.rl = [rlData.center.x - currentCenter.x, rlData.center.y - centeredBox.min.y, rlData.center.z - currentCenter.z];
+      wheelPositions.rr = [rrData.center.x - currentCenter.x, rrData.center.y - centeredBox.min.y, rrData.center.z - currentCenter.z];
+    } else {
+      wheelFL = fallback.wheelFL;
+      wheelFR = fallback.wheelFR;
+      wheelRL = fallback.wheelRL;
+      wheelRR = fallback.wheelRR;
+    }
+
     return {
-      chassis: chassis || cloned,
-      wheelFL: wheelFL || fallback.wheelFL,
-      wheelFR: wheelFR || fallback.wheelFR,
-      wheelRL: wheelRL || fallback.wheelRL,
-      wheelRR: wheelRR || fallback.wheelRR,
-      hitbox: entry.hitbox,
-      wheels: entry.wheels,
+      chassis: chassisContainer,
+      wheelFL,
+      wheelFR,
+      wheelRL,
+      wheelRR,
+      hitbox,
+      wheels: {
+        radius: wheelRadius,
+        positions: wheelPositions,
+      },
     };
   }, [entry, gltf]);
 }

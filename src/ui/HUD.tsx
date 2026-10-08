@@ -128,7 +128,7 @@ export default function HUD() {
 
       {/* Controls Hint */}
       <div className="hud-controls-hint">
-        WASD / Arrows: Drive | Space: Drift Handbrake | R: Respawn | C: Camera
+        WASD / Arrows: Drive | Space: Handbrake Drift | R: Respawn | C: Camera | M: Sound
       </div>
     </div>
   );

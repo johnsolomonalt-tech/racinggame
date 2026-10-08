@@ -14,6 +14,7 @@ import { initControls, controlState } from './game/controls';
 import { useGame } from './state/store';
 import { respawnAtStart } from './game/trackRuntime';
 import type { CarManifestEntry } from './game/carModel';
+import { audioEngine } from './game/audio';
 
 export default function App() {
   const phase = useGame((s) => s.phase);
@@ -82,6 +83,7 @@ export default function App() {
   }, [phase, setGame]);
 
   const handleStartRace = () => {
+    audioEngine.init();
     respawnAtStart();
     setGame({ phase: 'countdown' });
   };
@@ -117,7 +119,7 @@ export default function App() {
           <Physics timeStep={1 / 60} interpolate>
             <City />
             <Track />
-            <Vehicle manifestEntry={currentCar} />
+            <Vehicle key={currentCar ? currentCar.id : 'procedural'} manifestEntry={currentCar} />
           </Physics>
 
           <ChaseCamera />

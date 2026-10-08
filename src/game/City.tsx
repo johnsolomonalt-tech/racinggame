@@ -116,9 +116,11 @@ export default function City() {
         ))}
       </RigidBody>
 
-      {/* Streamed 3D GLB City Tiles */}
+      {/* Streamed 3D GLB City Tiles with per-tile Suspense */}
       {activeTileIds.map((id) => (
-        <CityTile key={id} id={id} />
+        <React.Suspense key={id} fallback={null}>
+          <CityTile id={id} />
+        </React.Suspense>
       ))}
     </group>
   );

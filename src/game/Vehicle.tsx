@@ -13,6 +13,7 @@ import { readInput } from './controls';
 import { useGame } from '../state/store';
 import { useResolvedCar, type CarManifestEntry } from './carModel';
 import { trackRuntime } from './trackRuntime';
+import { audioEngine } from './audio';
 
 interface VehicleProps {
   manifestEntry?: CarManifestEntry | null;
@@ -48,6 +49,7 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
 
     // Create Rapier Raycast Vehicle Controller
     const controller = (world as any).createVehicleController(body);
+    controller.setIndexForwardAxis = 2; // Z-axis forward in Three.js
     vehicleControllerRef.current = controller;
 
     const w = car.wheels;
@@ -63,7 +65,7 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
     wheelIndices.forEach(({ pos, isFront }) => {
       const connection = new rapier.Vector3(pos[0], pos[1], pos[2]);
       const dir = new rapier.Vector3(0, -1, 0);
-      const axle = new rapier.Vector3(-1, 0, 0);
+      const axle = new rapier.Vector3(1, 0, 0);
 
       controller.addWheel(connection, dir, axle, carConfig.suspensionRestLength, radius);
       const i = controller.numWheels() - 1;
@@ -224,11 +226,11 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
       // Throttle
       if (carConfig.drive === 'rwd' ? isRear : true) {
         if (currentGear.current === 'R' && isReversing) {
-          controller.applyEngineForce(i, -carConfig.reverseForce / 2);
+          controller.setWheelEngineForce(i, -carConfig.reverseForce / 2);
         } else if (input.throttle > 0 && speedKmh < carConfig.topSpeedKmh) {
-          controller.applyEngineForce(i, engineForce);
+          controller.setWheelEngineForce(i, engineForce);
         } else {
-          controller.applyEngineForce(i, 0);
+          controller.setWheelEngineForce(i, 0);
         }
       }
 
@@ -307,13 +309,16 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
 
       ref.current.position.set(origin[0], origin[1] - susp, origin[2]);
       ref.current.rotation.y = steer;
-      ref.current.rotation.x = rot;
+      ref.current.rotation.x = -rot;
     });
 
     // Impact decay for camera shake
     if (vehicleState.impact > 0) {
       vehicleState.impact = Math.max(0, vehicleState.impact - dt * 2.5);
     }
+
+    // Audio engine dynamic synthesis update
+    audioEngine.update(speedKmh, currentRpm.current, input.throttle, vehicleState.drift);
   });
 
   return (

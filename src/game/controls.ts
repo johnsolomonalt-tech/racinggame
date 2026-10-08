@@ -3,6 +3,7 @@
  * React re-renders. Call `initControls()` once (App does this).
  */
 import { respawnAtCheckpoint } from './trackRuntime';
+import { audioEngine } from './audio';
 
 export const keys = {
   forward: false,
@@ -48,6 +49,7 @@ function onKey(e: KeyboardEvent, down: boolean) {
   }
   if (!down || e.repeat) return;
   if (e.code === 'KeyR' && controlState.enabled) respawnAtCheckpoint();
+  if (e.code === 'KeyM') audioEngine.toggleMute();
   if (e.code === 'KeyC') {
     const i = cameraModes.indexOf(controlState.cameraMode);
     controlState.cameraMode = cameraModes[(i + 1) % cameraModes.length];
