@@ -54,12 +54,18 @@ export default function ChaseCamera() {
     const worldLookTarget = lookOffset.clone().applyQuaternion(carQuat);
     const targetLookAt = carPos.clone().add(worldLookTarget);
 
-    // Spring interpolation behind car
-    const posStiffness = mode === 'hood' ? 24 : 8.5;
-    currentPos.current.lerp(targetCamPos, 1.0 - Math.exp(-posStiffness * dt));
+    // Snap directly to car on first frame or when respawning
+    if (!currentPos.current.lengthSq() || vehicleState.respawn) {
+      currentPos.current.copy(targetCamPos);
+      currentLookAt.current.copy(targetLookAt);
+    } else {
+      // Spring interpolation behind car
+      const posStiffness = mode === 'hood' ? 24 : 8.5;
+      currentPos.current.lerp(targetCamPos, 1.0 - Math.exp(-posStiffness * dt));
 
-    const lookStiffness = mode === 'hood' ? 28 : 12;
-    currentLookAt.current.lerp(targetLookAt, 1.0 - Math.exp(-lookStiffness * dt));
+      const lookStiffness = mode === 'hood' ? 28 : 12;
+      currentLookAt.current.lerp(targetLookAt, 1.0 - Math.exp(-lookStiffness * dt));
+    }
 
     // Subtle shaking artifacts during drift or collision states (Section 4)
     const driftShake = vehicleState.drift * 0.08;

@@ -108,7 +108,7 @@ export default function App() {
           antialias: false,
         }}
         onCreated={({ gl, scene }) => {
-          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMapping = THREE.NoToneMapping;
           gl.outputColorSpace = THREE.SRGBColorSpace;
           scene.background = new THREE.Color('#0a0f1f');
           scene.fog = new THREE.FogExp2('#0a0f1f', 0.0015);

@@ -9,7 +9,31 @@
 import * as THREE from 'three';
 import type { TrackDef } from './vehicleState';
 import { vehicleState } from './vehicleState';
-import { FALLBACK_TRACK } from './Track';
+
+export const FALLBACK_TRACK: TrackDef = {
+  checkpoints: [
+    [-512.92, 417.58],
+    [-441.62, 460.88],
+    [-310.5, 540.5],
+    [-179.38, 620.12],
+    [-48.25, 699.75],
+    [34.82, 545.25],
+    [117.89, 390.75],
+    [200.95, 236.25],
+    [284.02, 81.75],
+    [139.11, 4.41],
+    [-5.8, -72.93],
+    [-89.15, 83.17],
+    [-172.5, 239.27],
+  ],
+  gateRadius: 18,
+  start: {
+    x: -534.56,
+    y: 1.2,
+    z: 404.4,
+    yaw: 0.54,
+  },
+};
 
 export interface SpawnTransform {
   position: THREE.Vector3 | [number, number, number] | { x: number; y: number; z: number };

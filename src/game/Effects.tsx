@@ -68,24 +68,25 @@ export default function Effects({ enableSSR = true }: EffectsProps) {
   return (
     <EffectComposer multisampling={0} enableNormalPass={enableSSR}>
       <Bloom
-        luminanceThreshold={0.88}
-        luminanceSmoothing={0.15}
-        intensity={1.2}
+        luminanceThreshold={1.0}
+        luminanceSmoothing={0.1}
+        intensity={0.8}
         mipmapBlur
       />
       {enableSSR ? (
         <SSR
-          intensity={0.65}
-          maxRoughness={0.6}
-          thickness={10}
-          ior={1.45}
-          maxDepthDifference={10}
+          intensity={0.45}
+          maxRoughness={0.4}
+          thickness={3}
+          ior={1.4}
+          maxDepthDifference={5}
+          STRETCH_MISSED_RAYS={false}
           ENABLE_BLUR={true}
           blurMix={0.5}
           blurSharpness={10}
-          blurKernelSize={8}
-          MAX_STEPS={20}
-          NUM_BINARY_SEARCH_STEPS={4}
+          blurKernelSize={6}
+          MAX_STEPS={18}
+          NUM_BINARY_SEARCH_STEPS={3}
         />
       ) : (
         <></>
