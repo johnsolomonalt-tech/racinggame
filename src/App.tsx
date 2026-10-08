@@ -13,8 +13,57 @@ import HUD from './ui/HUD';
 import { initControls, controlState } from './game/controls';
 import { useGame } from './state/store';
 import { respawnAtStart } from './game/trackRuntime';
+import { useProgress } from '@react-three/drei';
 import type { CarManifestEntry } from './game/carModel';
 import { audioEngine } from './game/audio';
+
+function AssetLoadingIndicator() {
+  const { active, progress } = useProgress();
+  if (!active && progress >= 100) return null;
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: 16,
+        right: 16,
+        background: 'rgba(10, 15, 25, 0.9)',
+        border: '1px solid rgba(0, 240, 255, 0.5)',
+        boxShadow: '0 0 20px rgba(0, 240, 255, 0.3)',
+        borderRadius: '8px',
+        padding: '10px 20px',
+        zIndex: 200,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '6px',
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ fontSize: '11px', fontWeight: 800, color: '#00f0ff', letterSpacing: '0.15em' }}>
+        {progress < 100 ? `STREAMING 3D ASSETS... ${Math.round(progress)}%` : 'READY'}
+      </div>
+      <div
+        style={{
+          width: '220px',
+          height: '4px',
+          background: 'rgba(255, 255, 255, 0.1)',
+          borderRadius: '2px',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            width: `${Math.max(5, progress)}%`,
+            background: 'linear-gradient(90deg, #00f0ff, #ff0077)',
+            transition: 'width 0.15s ease',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const phase = useGame((s) => s.phase);
@@ -130,6 +179,9 @@ export default function App() {
 
       {/* HTML / CSS HUD Layer (Outside Canvas) */}
       <HUD />
+
+      {/* Asset Loading Progress Bar */}
+      <AssetLoadingIndicator />
 
       {/* Countdown Overlay */}
       {phase === 'countdown' && (

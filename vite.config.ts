@@ -5,10 +5,14 @@ export default defineConfig({
   plugins: [react()],
   assetsInclude: ['**/*.glb', '**/*.gltf', '**/*.hdr'],
   server: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
+    port: 3000,
+    host: true,
+    cors: true,
+  },
+  preview: {
+    port: 3000,
+    host: true,
+    cors: true,
   },
   build: {
     target: 'esnext',

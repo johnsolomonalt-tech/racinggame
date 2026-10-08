@@ -6,6 +6,8 @@ import { RigidBody, CuboidCollider } from '@react-three/rapier';
 import { vehicleState } from './vehicleState';
 import { useGame } from '../state/store';
 
+import { trackRuntime } from './trackRuntime';
+
 interface TileMeta {
   id: string;
   center: [number, number];
@@ -35,6 +37,16 @@ export default function City() {
       .then((r) => r.json())
       .then((data: CityManifest) => {
         setManifest(data);
+        const sx = trackRuntime.track.start.x;
+        const sz = trackRuntime.track.start.z;
+        const initial = data.tiles
+          .filter((t) => {
+            const dx = t.center[0] - sx;
+            const dz = t.center[1] - sz;
+            return Math.sqrt(dx * dx + dz * dz) <= 600;
+          })
+          .map((t) => t.id);
+        setActiveTileIds(initial);
         setGame({ loadProgress: 0.5 });
       })
       .catch((err) => console.error('Failed to load city manifest:', err));
