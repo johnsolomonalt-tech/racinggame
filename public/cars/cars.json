@@ -1,0 +1,142 @@
+[
+  {
+    "id": "bmw-m4-gt3",
+    "name": "BMW M4 GT3 EVO",
+    "file": "/cars/bmw-m4-gt3.glb",
+    "credit": "Sketchfab Community",
+    "rotationY": 3.14159265,
+    "hitbox": {
+      "halfExtents": [0.95, 0.42, 2.35],
+      "center": [0, 0.82, 0]
+    },
+    "wheels": {
+      "radius": 0.34,
+      "positions": {
+        "fl": [-0.85, 0.58, -1.45],
+        "fr": [0.85, 0.58, -1.45],
+        "rl": [-0.85, 0.58, 1.47],
+        "rr": [0.85, 0.58, 1.47]
+      }
+    }
+  },
+  {
+    "id": "delorean-dmc12",
+    "name": "DeLorean DMC-12 Time Machine",
+    "file": "/cars/delorean-dmc12.glb",
+    "credit": "Sketchfab Community",
+    "rotationY": 3.14159265,
+    "hitbox": {
+      "halfExtents": [0.92, 0.38, 2.10],
+      "center": [0, 0.76, 0]
+    },
+    "wheels": {
+      "radius": 0.32,
+      "positions": {
+        "fl": [-0.80, 0.55, -1.25],
+        "fr": [0.80, 0.55, -1.25],
+        "rl": [-0.80, 0.55, 1.25],
+        "rr": [0.80, 0.55, 1.25]
+      }
+    }
+  },
+  {
+    "id": "ferrari-f40",
+    "name": "LB-Works Ferrari F40",
+    "file": "/cars/ferrari-f40.glb",
+    "credit": "Sketchfab Community",
+    "rotationY": 0,
+    "hitbox": {
+      "halfExtents": [0.96, 0.38, 2.15],
+      "center": [0, 0.74, 0]
+    },
+    "wheels": {
+      "radius": 0.33,
+      "positions": {
+        "fl": [-0.82, 0.55, -1.22],
+        "fr": [0.82, 0.55, -1.22],
+        "rl": [-0.84, 0.55, 1.23],
+        "rr": [0.84, 0.55, 1.23]
+      }
+    }
+  },
+  {
+    "id": "nissan-skyline-r34",
+    "name": "Nissan Skyline GT-R R34",
+    "file": "/cars/nissan-skyline-r34.glb",
+    "credit": "Sketchfab Community",
+    "rotationY": 3.14159265,
+    "hitbox": {
+      "halfExtents": [0.89, 0.44, 2.25],
+      "center": [0, 0.82, 0]
+    },
+    "wheels": {
+      "radius": 0.33,
+      "positions": {
+        "fl": [-0.78, 0.56, -1.33],
+        "fr": [0.78, 0.56, -1.33],
+        "rl": [-0.78, 0.56, 1.33],
+        "rr": [0.78, 0.56, 1.33]
+      }
+    }
+  },
+  {
+    "id": "porsche-996-gt300",
+    "name": "Porsche 996 GT300",
+    "file": "/cars/porsche-996-gt300.glb",
+    "credit": "Sketchfab Community",
+    "rotationY": 0,
+    "hitbox": {
+      "halfExtents": [0.90, 0.42, 2.18],
+      "center": [0, 0.80, 0]
+    },
+    "wheels": {
+      "radius": 0.33,
+      "positions": {
+        "fl": [-0.76, 0.55, -1.18],
+        "fr": [0.76, 0.55, -1.18],
+        "rl": [-0.78, 0.55, 1.18],
+        "rr": [0.78, 0.55, 1.18]
+      }
+    }
+  },
+  {
+    "id": "porsche-911-turbo",
+    "name": "Porsche 911 Turbo 1975",
+    "file": "/cars/porsche-911-turbo.glb",
+    "credit": "Sketchfab Community",
+    "rotationY": 0,
+    "hitbox": {
+      "halfExtents": [0.88, 0.42, 2.12],
+      "center": [0, 0.80, 0]
+    },
+    "wheels": {
+      "radius": 0.32,
+      "positions": {
+        "fl": [-0.72, 0.55, -1.14],
+        "fr": [0.72, 0.55, -1.14],
+        "rl": [-0.75, 0.55, 1.13],
+        "rr": [0.75, 0.55, 1.13]
+      }
+    }
+  },
+  {
+    "id": "ford-raptor-r",
+    "name": "Ford F-150 Raptor R",
+    "file": "/cars/ford-raptor-r.glb",
+    "credit": "Sketchfab Community",
+    "rotationY": 3.14159265,
+    "hitbox": {
+      "halfExtents": [1.10, 0.72, 2.90],
+      "center": [0, 1.32, 0]
+    },
+    "wheels": {
+      "radius": 0.44,
+      "positions": {
+        "fl": [-0.95, 0.88, -1.84],
+        "fr": [0.95, 0.88, -1.84],
+        "rl": [-0.95, 0.88, 1.84],
+        "rr": [0.95, 0.88, 1.84]
+      }
+    }
+  }
+]

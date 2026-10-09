@@ -93,18 +93,34 @@ export default function Track() {
       {trackDef.checkpoints.map((pt, idx) => {
         const isFinish = idx === 0;
         const isNext = idx === nextCheckpoint % trackDef.checkpoints.length;
-        const color = isFinish ? '#ff0077' : isNext ? '#00f0ff' : '#334466';
+        const color = isFinish ? '#ff0077' : isNext ? '#00f0ff' : '#223355';
+
+        // Compute gate orientation along track tangent
+        const nextIdx = (idx + 1) % trackDef.checkpoints.length;
+        const nextPt = trackDef.checkpoints[nextIdx];
+        const dx = nextPt[0] - pt[0];
+        const dz = nextPt[1] - pt[1];
+        const yaw = Math.atan2(dx, dz);
 
         return (
-          <group key={idx} position={[pt[0], 4, pt[1]]}>
+          <group key={idx} position={[pt[0], 0, pt[1]]} rotation={[0, yaw, 0]}>
             {/* Gate Arch */}
-            <mesh>
-              <torusGeometry args={[trackDef.gateRadius, 0.25, 8, 24, Math.PI]} />
+            <mesh position={[0, 6.5, 0]}>
+              <torusGeometry args={[13.5, 0.35, 12, 32, Math.PI]} />
               <meshStandardMaterial
                 color={color}
                 emissive={color}
-                emissiveIntensity={isNext || isFinish ? 2.5 : 0.4}
+                emissiveIntensity={isNext || isFinish ? 2.5 : 0.25}
               />
+            </mesh>
+            {/* Base Pillars on Sidewalks */}
+            <mesh position={[-13.5, 3.25, 0]}>
+              <cylinderGeometry args={[0.38, 0.48, 6.5, 12]} />
+              <meshStandardMaterial color="#141c2b" metalness={0.8} roughness={0.3} />
+            </mesh>
+            <mesh position={[13.5, 3.25, 0]}>
+              <cylinderGeometry args={[0.38, 0.48, 6.5, 12]} />
+              <meshStandardMaterial color="#141c2b" metalness={0.8} roughness={0.3} />
             </mesh>
           </group>
         );

@@ -112,6 +112,17 @@ export default function City() {
 
   return (
     <group>
+      {/* Wet asphalt ground plane receiving dynamic vehicle shadows */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+        <planeGeometry args={[5000, 5000]} />
+        <meshStandardMaterial
+          color="#0c1018"
+          roughness={0.28}
+          metalness={0.25}
+          envMapIntensity={1.2}
+        />
+      </mesh>
+
       {/* Ground Physical Collider */}
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider args={[2500, 1, 2500]} position={[0, -1, 0]} friction={0.9} restitution={0.0} />

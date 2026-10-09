@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import {
@@ -7,7 +7,7 @@ import {
   useRapier,
   type RapierRigidBody,
 } from '@react-three/rapier';
-import { carConfig } from './carConfig';
+import { getCarConfig } from './carConfig';
 import { vehicleState } from './vehicleState';
 import { readInput } from './controls';
 import { useGame } from '../state/store';
@@ -22,6 +22,7 @@ interface VehicleProps {
 export default function Vehicle({ manifestEntry = null }: VehicleProps) {
   const { rapier, world } = useRapier();
   const car = useResolvedCar(manifestEntry);
+  const config = getCarConfig(manifestEntry ? manifestEntry.id : null);
   const chassisRef = useRef<RapierRigidBody>(null);
 
   // Wheel transform visual groups
@@ -41,6 +42,13 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
   const upsideDownTimer = useRef(0);
   const driftComboAcc = useRef(0);
   const driftGraceTimer = useRef(0);
+  const wheelRoll = useRef(0);
+  const tailLightRef = useRef<THREE.Group>(null);
+  const headlightTarget = useMemo(() => {
+    const obj = new THREE.Object3D();
+    obj.position.set(0, -0.4, -30);
+    return obj;
+  }, []);
 
   // Initialise Raycast Vehicle Controller
   useEffect(() => {
@@ -65,17 +73,19 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
     wheelIndices.forEach(({ pos, isFront }) => {
       const connection = new rapier.Vector3(pos[0], pos[1], pos[2]);
       const dir = new rapier.Vector3(0, -1, 0);
+      // Axle points along right (+X) axis: (0,-1,0) x (1,0,0) produces (0,0,-1) forward in Three.js (-Z)
       const axle = new rapier.Vector3(1, 0, 0);
 
-      controller.addWheel(connection, dir, axle, carConfig.suspensionRestLength, radius);
+      controller.addWheel(connection, dir, axle, config.suspensionRestLength, radius);
       const i = controller.numWheels() - 1;
 
-      controller.setWheelSuspensionStiffness(i, carConfig.suspensionStiffness);
-      controller.setWheelMaxSuspensionTravel(i, carConfig.maxSuspensionTravel);
-      controller.setWheelSuspensionCompression(i, carConfig.suspensionCompression);
-      controller.setWheelSuspensionRelaxation(i, carConfig.suspensionRelaxation);
-      controller.setWheelFrictionSlip(i, isFront ? carConfig.frictionSlipFront : carConfig.frictionSlipRear);
-      controller.setWheelSideFrictionStiffness(i, isFront ? carConfig.sideFrictionFront : carConfig.sideFrictionRear);
+      controller.setWheelSuspensionStiffness(i, config.suspensionStiffness);
+      controller.setWheelMaxSuspensionTravel(i, config.maxSuspensionTravel);
+      controller.setWheelSuspensionCompression(i, config.suspensionCompression);
+      controller.setWheelSuspensionRelaxation(i, config.suspensionRelaxation);
+      controller.setWheelMaxSuspensionForce(i, config.maxSuspensionForce ?? Math.max(120000, config.mass * 35));
+      controller.setWheelFrictionSlip(i, isFront ? config.frictionSlipFront : config.frictionSlipRear);
+      controller.setWheelSideFrictionStiffness(i, isFront ? config.sideFrictionFront : config.sideFrictionRear);
     });
 
     vehicleState.ready = true;
@@ -91,7 +101,7 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
       }
       vehicleControllerRef.current = null;
     };
-  }, [world, rapier, car]);
+  }, [world, rapier, car, config]);
 
   // Frame simulation and synchronization
   useFrame((_, delta) => {
@@ -135,9 +145,9 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
     const lateralMs = vehicleState.velocity.dot(right);
 
     // 3. Auto anti-flip check (if upside-down or out of bounds)
-    if (up.y < 0.2) {
+    if (up.y < 0.25) {
       upsideDownTimer.current += dt;
-      if (upsideDownTimer.current > carConfig.flipRespawnTime) {
+      if (upsideDownTimer.current > config.flipRespawnTime) {
         if (trackRuntime.lastCheckpoint) {
           const cpPos = trackRuntime.lastCheckpoint.position;
           const posVec = cpPos instanceof THREE.Vector3
@@ -161,7 +171,7 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
       upsideDownTimer.current = 0;
     }
 
-    if (t.y < carConfig.killY) {
+    if (t.y < config.killY) {
       vehicleState.respawn = {
         position: new THREE.Vector3(trackRuntime.track.start.x, trackRuntime.track.start.y, trackRuntime.track.start.z),
         yaw: trackRuntime.track.start.yaw,
@@ -171,10 +181,13 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
     // 4. Input handling
     const input = readInput();
 
-    // Speed-dependent steering angle
-    const steerFactor = THREE.MathUtils.clamp(1.0 - Math.abs(speedKmh) / carConfig.steerFalloffKmh, 0.15, 1.0);
-    const targetSteer = input.steer * (carConfig.maxSteerLow * steerFactor);
-    const steerRate = input.steer !== 0 ? carConfig.steerRate : carConfig.steerReturnRate;
+    // Speed-dependent steering angle (tight low-speed radius, stable high-speed taper)
+    const speedRatio = THREE.MathUtils.clamp(Math.abs(speedKmh) / config.steerFalloffKmh, 0, 1);
+    const maxSteer = THREE.MathUtils.lerp(config.maxSteerLow, config.maxSteerHigh, speedRatio * speedRatio);
+    // steer: +1 for left (KeyA), -1 for right (KeyD).
+    // In Rapier with dir=(0,-1,0) and axle=(1,0,0), positive angle turns LEFT (-X), negative angle turns RIGHT (+X).
+    const targetSteer = input.steer * maxSteer;
+    const steerRate = input.steer !== 0 ? config.steerRate : config.steerReturnRate;
     currentSteer.current = THREE.MathUtils.damp(currentSteer.current, targetSteer, steerRate, dt);
 
     controller.setWheelSteering(0, currentSteer.current);
@@ -189,23 +202,24 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
     if (input.throttle > 0 && speedKmh >= -2) {
       if (gear === 'R') gear = 1;
       const gearIdx = typeof gear === 'number' ? gear - 1 : 0;
-      const topOfGear = carConfig.gearTopKmh[gearIdx];
-      const bottomOfGear = gearIdx > 0 ? carConfig.gearTopKmh[gearIdx - 1] : 0;
+      const topOfGear = config.gearTopKmh[gearIdx] || config.topSpeedKmh;
+      const bottomOfGear = gearIdx > 0 ? config.gearTopKmh[gearIdx - 1] : 0;
       const rpm = (Math.abs(speedKmh) - bottomOfGear) / Math.max(1, topOfGear - bottomOfGear);
-      currentRpm.current = THREE.MathUtils.clamp(rpm, carConfig.idleRpm, 1.0);
+      currentRpm.current = THREE.MathUtils.clamp(rpm, config.idleRpm, 1.0);
 
-      if (gearIdx < 5 && rpm > carConfig.upshiftRpm && shiftTimer.current <= 0) {
+      const maxGears = config.gearTopKmh.length;
+      if (gearIdx < maxGears - 1 && rpm > config.upshiftRpm && shiftTimer.current <= 0) {
         currentGear.current = (gearIdx + 2);
-        shiftTimer.current = carConfig.shiftTime;
-      } else if (gearIdx > 0 && rpm < carConfig.downshiftRpm && shiftTimer.current <= 0) {
+        shiftTimer.current = config.shiftTime;
+      } else if (gearIdx > 0 && rpm < config.downshiftRpm && shiftTimer.current <= 0) {
         currentGear.current = (gearIdx);
-        shiftTimer.current = carConfig.shiftTime;
+        shiftTimer.current = config.shiftTime;
       }
     } else if (input.brake > 0 && speedKmh < 2) {
       currentGear.current = 'R';
-      currentRpm.current = THREE.MathUtils.clamp(Math.abs(speedKmh) / carConfig.reverseMaxKmh, 0.2, 1.0);
+      currentRpm.current = THREE.MathUtils.clamp(Math.abs(speedKmh) / config.reverseMaxKmh, 0.2, 1.0);
     } else {
-      currentRpm.current = THREE.MathUtils.damp(currentRpm.current, carConfig.idleRpm, 4.0, dt);
+      currentRpm.current = THREE.MathUtils.damp(currentRpm.current, config.idleRpm, 4.0, dt);
     }
 
     vehicleState.gear = currentGear.current;
@@ -214,73 +228,84 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
     // Apply Drive Forces & Braking
     const isShifting = shiftTimer.current > 0;
     const gearIdx = typeof currentGear.current === 'number' ? currentGear.current - 1 : 0;
-    const torqueMult = currentGear.current === 'R' ? 0.7 : carConfig.gearTorque[gearIdx];
-    const engineForce = (isShifting ? 0 : carConfig.engineForce * torqueMult * input.throttle) / 2;
+    const torqueMult = currentGear.current === 'R' ? 0.7 : (config.gearTorque[gearIdx] ?? 0.5);
+    const totalEngineForce = isShifting ? 0 : config.engineForce * torqueMult * input.throttle;
 
     const isBraking = input.brake > 0 && speedKmh > 2;
     const isReversing = input.brake > 0 && speedKmh <= 2;
 
+    if (tailLightRef.current) {
+      const brakeInt = input.brake > 0 ? 5.0 : 1.2;
+      tailLightRef.current.children.forEach((c) => {
+        if ('intensity' in c) (c as THREE.Light).intensity = brakeInt;
+      });
+    }
+
     for (let i = 0; i < 4; i++) {
       const isRear = i >= 2;
+      const isDriven = config.drive === 'awd' ? true : isRear;
+      const numDriven = config.drive === 'awd' ? 4 : 2;
 
-      // Throttle
-      if (carConfig.drive === 'rwd' ? isRear : true) {
+      // Throttle application
+      if (isDriven) {
         if (currentGear.current === 'R' && isReversing) {
-          controller.setWheelEngineForce(i, -carConfig.reverseForce / 2);
-        } else if (input.throttle > 0 && speedKmh < carConfig.topSpeedKmh) {
-          controller.setWheelEngineForce(i, engineForce);
+          controller.setWheelEngineForce(i, -config.reverseForce / numDriven);
+        } else if (input.throttle > 0 && speedKmh < config.topSpeedKmh) {
+          controller.setWheelEngineForce(i, totalEngineForce / numDriven);
         } else {
           controller.setWheelEngineForce(i, 0);
         }
+      } else {
+        controller.setWheelEngineForce(i, 0);
       }
 
       // Brakes
       let brakeForce = 0;
       if (isBraking) {
-        brakeForce = carConfig.brakeImpulse;
+        brakeForce = config.brakeImpulse;
       } else if (input.handbrake && isRear) {
-        brakeForce = carConfig.handbrakeImpulse;
+        brakeForce = config.handbrakeImpulse;
       } else if (input.throttle === 0 && !isBraking) {
-        brakeForce = carConfig.coastBrake;
+        brakeForce = config.coastBrake;
       }
       controller.setWheelBrake(i, brakeForce);
 
       // Drift physics (tweak rear friction)
       if (isRear) {
         if (input.handbrake) {
-          controller.setWheelFrictionSlip(i, carConfig.frictionSlipRear * carConfig.handbrakeRearSlip);
-          controller.setWheelSideFrictionStiffness(i, carConfig.sideFrictionRear * carConfig.handbrakeRearSide);
+          controller.setWheelFrictionSlip(i, config.frictionSlipRear * config.handbrakeRearSlip);
+          controller.setWheelSideFrictionStiffness(i, config.sideFrictionRear * config.handbrakeRearSide);
         } else {
-          controller.setWheelFrictionSlip(i, carConfig.frictionSlipRear);
-          controller.setWheelSideFrictionStiffness(i, carConfig.sideFrictionRear);
+          controller.setWheelFrictionSlip(i, config.frictionSlipRear);
+          controller.setWheelSideFrictionStiffness(i, config.sideFrictionRear);
         }
       }
     }
 
     // 6. Aerodynamic Downforce & Drag
     const speedSq = speedMs * speedMs;
-    const downforce = carConfig.downforceK * speedSq;
+    const downforce = config.downforceK * speedSq * 9.81 * (config.mass / 1200);
     body.applyImpulse({ x: 0, y: -downforce * dt, z: 0 }, true);
 
-    const drag = carConfig.dragK * speedSq * Math.sign(speedMs);
+    const drag = config.dragK * speedSq * Math.sign(speedMs);
     body.applyImpulse({ x: -fwd.x * drag * dt, y: 0, z: -fwd.z * drag * dt }, true);
 
     // 7. Drift scoring calculation
     const isDrifting =
-      Math.abs(speedKmh) > carConfig.driftMinKmh &&
-      Math.abs(lateralMs) > carConfig.driftLatStart;
+      Math.abs(speedKmh) > config.driftMinKmh &&
+      Math.abs(lateralMs) > config.driftLatStart;
 
     const driftIntensity = isDrifting
-      ? THREE.MathUtils.clamp((Math.abs(lateralMs) - carConfig.driftLatStart) / (carConfig.driftLatFull - carConfig.driftLatStart), 0, 1)
+      ? THREE.MathUtils.clamp((Math.abs(lateralMs) - config.driftLatStart) / (config.driftLatFull - config.driftLatStart), 0, 1)
       : 0;
 
-    vehicleState.drift = driftIntensity;
+    vehicleState.drift = THREE.MathUtils.damp(vehicleState.drift, driftIntensity, 6.0, dt);
 
     const store = useGame.getState();
     if (store.phase === 'racing') {
       if (driftIntensity > 0.1) {
-        driftGraceTimer.current = carConfig.driftBankDelay;
-        const pts = Math.round(driftIntensity * (Math.abs(speedKmh) / 100) * carConfig.driftPointsRate * dt);
+        driftGraceTimer.current = config.driftBankDelay;
+        const pts = Math.round(driftIntensity * (Math.abs(speedKmh) / 100) * config.driftPointsRate * dt);
         driftComboAcc.current += pts;
         store.set({ driftCombo: Math.round(driftComboAcc.current) });
       } else if (driftComboAcc.current > 0) {
@@ -298,19 +323,21 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
     // 8. Update Rapier Vehicle Simulation
     controller.updateVehicle(dt);
 
-    // 9. Sync Wheel Visual Transformations
-    const wheelRefs = [wheelFLRef, wheelFRRef, wheelRLRef, wheelRRRef];
-    wheelRefs.forEach((ref, idx) => {
-      if (!ref.current) return;
-      const rot = controller.wheelRotation(idx);
-      const steer = controller.wheelSteering(idx);
-      const susp = controller.wheelSuspensionLength(idx);
-      const origin = car.wheels.positions[idx === 0 ? 'fl' : idx === 1 ? 'fr' : idx === 2 ? 'rl' : 'rr'];
+    // 9. Sync Wheel Visual Transformations (for procedural cars with separate wheels)
+    if (car.hasSeparateWheels) {
+      wheelRoll.current += (speedMs / Math.max(0.1, car.wheels.radius)) * dt;
+      const wheelRefs = [wheelFLRef, wheelFRRef, wheelRLRef, wheelRRRef];
+      wheelRefs.forEach((ref, idx) => {
+        if (!ref.current) return;
+        const steer = controller.wheelSteering(idx);
+        const susp = controller.wheelSuspensionLength(idx);
+        const origin = car.wheels.positions[idx === 0 ? 'fl' : idx === 1 ? 'fr' : idx === 2 ? 'rl' : 'rr'];
 
-      ref.current.position.set(origin[0], origin[1] - susp, origin[2]);
-      ref.current.rotation.y = steer;
-      ref.current.rotation.x = -rot;
-    });
+        ref.current.position.set(origin[0], origin[1] - susp, origin[2]);
+        ref.current.rotation.y = idx < 2 ? steer : 0;
+        ref.current.rotation.x = -wheelRoll.current;
+      });
+    }
 
     // Impact decay for camera shake
     if (vehicleState.impact > 0) {
@@ -319,6 +346,15 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
 
     // Audio engine dynamic synthesis update
     audioEngine.update(speedKmh, currentRpm.current, input.throttle, vehicleState.drift);
+
+    // Debug hook
+    (window as any).__VEHICLE_DEBUG__ = {
+      pos: [t.x.toFixed(2), t.y.toFixed(2), t.z.toFixed(2)],
+      speed: Math.round(speedKmh),
+      gear: currentGear.current,
+      steer: currentSteer.current.toFixed(2),
+      carId: manifestEntry ? manifestEntry.id : 'procedural-gt',
+    };
   });
 
   return (
@@ -326,9 +362,13 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
       ref={chassisRef}
       colliders={false}
       type="dynamic"
-      mass={carConfig.mass}
-      linearDamping={carConfig.linearDamping}
-      angularDamping={carConfig.angularDamping}
+      mass={config.mass}
+      linearDamping={config.linearDamping}
+      angularDamping={config.angularDamping}
+      additionalMassProperties={{
+        mass: config.mass,
+        centerOfMass: { x: 0, y: config.comOffsetY, z: 0 },
+      }}
       position={[trackRuntime.track.start.x, trackRuntime.track.start.y, trackRuntime.track.start.z]}
       rotation={[0, trackRuntime.track.start.yaw, 0]}
       onContactForce={(payload) => {
@@ -336,57 +376,72 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
         if (force > 3000) {
           const norm = THREE.MathUtils.clamp((force - 3000) / 25000, 0, 1);
           vehicleState.impact = Math.max(vehicleState.impact, norm);
-          if (norm > carConfig.driftCrashImpact) {
+          if (norm > config.driftCrashImpact) {
             driftComboAcc.current = 0;
             useGame.getState().set({ driftCombo: 0 });
           }
         }
       }}
     >
-      {/* Chassis Cuboid Collider */}
+      {/* Chassis Physical Cuboid Collider with Ground Clearance (will NEVER scrape the road) */}
       <CuboidCollider
         args={car.hitbox.halfExtents}
         position={car.hitbox.center}
-        friction={carConfig.chassisFriction}
-        restitution={carConfig.chassisRestitution}
+        friction={config.chassisFriction}
+        restitution={config.chassisRestitution}
       />
 
-      {/* Car Visual Mesh & Headlights */}
+      {/* Car Visual Mesh */}
       <primitive object={car.chassis} />
 
-      {/* Dynamic Headlights (night driving) */}
+      {/* Headlight Forward Focus Target (moves with vehicle chassis) */}
+      <primitive object={headlightTarget} />
+
+      {/* Dynamic Front Road Illumination (Dual Focused Spotlights) */}
       <spotLight
-        position={[-0.6, 0.55, -2.1]}
-        target-position={[-0.6, 0, -35]}
-        angle={0.45}
-        penumbra={0.5}
-        intensity={8.0}
-        color="#e0f0ff"
-        castShadow={false}
+        target={headlightTarget}
+        position={[-car.hitbox.halfExtents[0] * 0.72, 0.45, -car.hitbox.halfExtents[2] - 0.15]}
+        angle={0.42}
+        penumbra={0.65}
+        intensity={22.0}
+        distance={60}
+        color="#edf5ff"
+        decay={1.6}
       />
       <spotLight
-        position={[0.6, 0.55, -2.1]}
-        target-position={[0.6, 0, -35]}
-        angle={0.45}
-        penumbra={0.5}
-        intensity={8.0}
-        color="#e0f0ff"
-        castShadow={false}
+        target={headlightTarget}
+        position={[car.hitbox.halfExtents[0] * 0.72, 0.45, -car.hitbox.halfExtents[2] - 0.15]}
+        angle={0.42}
+        penumbra={0.65}
+        intensity={22.0}
+        distance={60}
+        color="#edf5ff"
+        decay={1.6}
       />
 
-      {/* Visual Wheels */}
-      <group ref={wheelFLRef}>
-        <primitive object={car.wheelFL} />
+      {/* Reactive Red Taillight Glow (Dual Soft Taillights) */}
+      <group ref={tailLightRef} position={[0, car.hitbox.center[1] * 0.65, car.hitbox.halfExtents[2]]}>
+        <pointLight position={[-car.hitbox.halfExtents[0] * 0.7, 0, 0.35]} intensity={1.2} distance={8} color="#ff0028" decay={2.0} />
+        <pointLight position={[car.hitbox.halfExtents[0] * 0.7, 0, 0.35]} intensity={1.2} distance={8} color="#ff0028" decay={2.0} />
       </group>
-      <group ref={wheelFRRef}>
-        <primitive object={car.wheelFR} />
-      </group>
-      <group ref={wheelRLRef}>
-        <primitive object={car.wheelRL} />
-      </group>
-      <group ref={wheelRRRef}>
-        <primitive object={car.wheelRR} />
-      </group>
+
+      {/* Visual Wheels (only rendered for vehicles with separate wheel sub-meshes) */}
+      {car.hasSeparateWheels && (
+        <>
+          <group ref={wheelFLRef}>
+            <primitive object={car.wheelFL} />
+          </group>
+          <group ref={wheelFRRef}>
+            <primitive object={car.wheelFR} />
+          </group>
+          <group ref={wheelRLRef}>
+            <primitive object={car.wheelRL} />
+          </group>
+          <group ref={wheelRRRef}>
+            <primitive object={car.wheelRR} />
+          </group>
+        </>
+      )}
     </RigidBody>
   );
 }

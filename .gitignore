@@ -28,4 +28,4 @@ dist-ssr
 
 # Raw source assets (NYC .3dm etc.)
 asset-src/
-cars/
+/cars/

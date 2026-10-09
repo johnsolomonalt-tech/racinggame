@@ -63,37 +63,34 @@ function createCinematicLUT(size = 16): THREE.Data3DTexture {
 }
 
 export default function Effects({ enableSSR = true }: EffectsProps) {
-  const lutTexture = useMemo(() => createCinematicLUT(16), []);
-
   return (
     <EffectComposer multisampling={0} enableNormalPass={enableSSR}>
+      <ToneMapping mode={THREE.ACESFilmicToneMapping} />
       <Bloom
-        luminanceThreshold={1.0}
-        luminanceSmoothing={0.1}
-        intensity={0.8}
+        luminanceThreshold={1.2}
+        luminanceSmoothing={0.25}
+        intensity={0.5}
         mipmapBlur
       />
       {enableSSR ? (
         <SSR
-          intensity={0.45}
-          maxRoughness={0.4}
-          thickness={3}
+          intensity={0.3}
+          maxRoughness={0.55}
+          thickness={4.0}
           ior={1.4}
-          maxDepthDifference={5}
+          maxDepthDifference={6}
           STRETCH_MISSED_RAYS={false}
           ENABLE_BLUR={true}
-          blurMix={0.5}
-          blurSharpness={10}
-          blurKernelSize={6}
-          MAX_STEPS={18}
-          NUM_BINARY_SEARCH_STEPS={3}
+          blurMix={0.75}
+          blurSharpness={3}
+          blurKernelSize={8}
+          MAX_STEPS={24}
+          NUM_BINARY_SEARCH_STEPS={4}
         />
       ) : (
         <></>
       )}
-      <LUT lut={lutTexture} blendFunction={BlendFunction.NORMAL} />
-      <Vignette eskil={false} offset={0.15} darkness={0.6} />
-      <ToneMapping mode={THREE.ACESFilmicToneMapping} />
+      <Vignette eskil={false} offset={0.25} darkness={0.4} />
     </EffectComposer>
   );
 }

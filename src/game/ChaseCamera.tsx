@@ -36,15 +36,15 @@ export default function ChaseCamera() {
     let lookOffset: THREE.Vector3;
 
     if (mode === 'hood') {
-      offset = new THREE.Vector3(0, 0.8, -0.6);
+      offset = new THREE.Vector3(0, 0.9, -0.4);
       lookOffset = new THREE.Vector3(0, 0.7, -15);
     } else if (mode === 'far') {
-      offset = new THREE.Vector3(0, 3.8, 9.5);
-      lookOffset = new THREE.Vector3(0, 1.2, -6);
+      offset = new THREE.Vector3(0, 3.0, 7.5);
+      lookOffset = new THREE.Vector3(0, 1.0, -6);
     } else {
-      // Default Chase mode
-      offset = new THREE.Vector3(0, 2.3, 5.8);
-      lookOffset = new THREE.Vector3(0, 1.0, -8);
+      // Default Chase mode: framed right behind the vehicle
+      offset = new THREE.Vector3(0, 1.75, 4.6);
+      lookOffset = new THREE.Vector3(0, 0.85, -6.0);
     }
 
     // World target position

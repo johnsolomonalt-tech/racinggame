@@ -74,7 +74,7 @@ export default function App() {
   const [availableCars, setAvailableCars] = useState<CarManifestEntry[]>([]);
   const [selectedCarIndex, setSelectedCarIndex] = useState<number>(-1);
   const [countdownNum, setCountdownNum] = useState<number>(3);
-  const [enableSSR, setEnableSSR] = useState<boolean>(true);
+  const [enableSSR, setEnableSSR] = useState<boolean>(false);
 
   // Initialize controls once
   useEffect(() => {
@@ -159,8 +159,8 @@ export default function App() {
         onCreated={({ gl, scene }) => {
           gl.toneMapping = THREE.NoToneMapping;
           gl.outputColorSpace = THREE.SRGBColorSpace;
-          scene.background = new THREE.Color('#0a0f1f');
-          scene.fog = new THREE.FogExp2('#0a0f1f', 0.0015);
+          scene.background = new THREE.Color('#090f1d');
+          scene.fog = new THREE.FogExp2('#090f1d', 0.0007);
         }}
         camera={{ position: [0, 4, 10], fov: 60, near: 0.2, far: 2000 }}
       >
