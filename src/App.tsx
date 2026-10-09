@@ -68,12 +68,9 @@ function AssetLoadingIndicator() {
 export default function App() {
   const phase = useGame((s) => s.phase);
   const setGame = useGame((s) => s.set);
-  const bestLap = useGame((s) => s.bestLap);
-  const driftScore = useGame((s) => s.driftScore);
 
   const [availableCars, setAvailableCars] = useState<CarManifestEntry[]>([]);
   const [selectedCarIndex, setSelectedCarIndex] = useState<number>(-1);
-  const [countdownNum, setCountdownNum] = useState<number>(3);
   const [enableSSR, setEnableSSR] = useState<boolean>(false);
 
   // Initialize controls once
@@ -91,55 +88,23 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  // Countdown timer logic
+  // Control state synchronization
   useEffect(() => {
-    if (phase === 'countdown') {
-      controlState.enabled = false;
-      controlState.forceHandbrake = true;
-      setCountdownNum(3);
-
-      const t1 = setTimeout(() => setCountdownNum(2), 1000);
-      const t2 = setTimeout(() => setCountdownNum(1), 2000);
-      const t3 = setTimeout(() => {
-        const now = performance.now();
-        setGame({
-          phase: 'racing',
-          raceStartedAt: now,
-          lapStartedAt: now,
-          lap: 0,
-          lapTimes: [],
-          bestLap: null,
-          driftScore: 0,
-          driftCombo: 0,
-          nextCheckpoint: 1,
-        });
-        controlState.enabled = true;
-        controlState.forceHandbrake = false;
-      }, 3000);
-
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
-      };
-    } else if (phase === 'racing') {
+    if (phase === 'racing' || phase === 'roam') {
       controlState.enabled = true;
       controlState.forceHandbrake = false;
     } else {
       controlState.enabled = false;
       controlState.forceHandbrake = true;
     }
-  }, [phase, setGame]);
+  }, [phase]);
 
-  const handleStartRace = () => {
+  const handleStartFreeRoam = () => {
     audioEngine.init();
     respawnAtStart();
-    setGame({ phase: 'countdown' });
-  };
-
-  const handleRestart = () => {
-    respawnAtStart();
-    setGame({ phase: 'menu' });
+    setGame({ phase: 'roam' });
+    controlState.enabled = true;
+    controlState.forceHandbrake = false;
   };
 
   const currentCar = selectedCarIndex >= 0 && availableCars[selectedCarIndex]
@@ -177,25 +142,22 @@ export default function App() {
         </Suspense>
       </Canvas>
 
-      {/* HTML / CSS HUD Layer (Outside Canvas) */}
-      <HUD />
+      {/* HTML / CSS Open-World HUD Layer (Outside Canvas) */}
+      <HUD
+        cars={availableCars}
+        selectedCarIndex={selectedCarIndex}
+        onSelectCar={setSelectedCarIndex}
+      />
 
       {/* Asset Loading Progress Bar */}
       <AssetLoadingIndicator />
 
-      {/* Countdown Overlay */}
-      {phase === 'countdown' && (
-        <div style={styles.overlay}>
-          <div style={styles.countdown}>{countdownNum}</div>
-        </div>
-      )}
-
-      {/* Main Menu Overlay */}
+      {/* Main Menu Overlay (Open World Entry) */}
       {phase === 'menu' && (
         <div style={styles.overlay}>
           <div style={styles.menuBox}>
-            <h1 style={styles.title}>NYC MIDTOWN GP</h1>
-            <p style={styles.subtitle}>HIGH-PERFORMANCE WEB RACER</p>
+            <h1 style={styles.title}>NYC OPEN WORLD</h1>
+            <p style={styles.subtitle}>MANHATTAN FREE ROAM & DRIFT SIMULATION</p>
 
             <div style={styles.section}>
               <div style={styles.label}>SELECT VEHICLE:</div>
@@ -248,25 +210,8 @@ export default function App() {
               </div>
             </div>
 
-            <button style={styles.startBtn} onClick={handleStartRace}>
-              START RACE
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Results / Finished Overlay */}
-      {phase === 'finished' && (
-        <div style={styles.overlay}>
-          <div style={styles.menuBox}>
-            <h1 style={{ ...styles.title, color: '#00f0ff' }}>RACE FINISHED!</h1>
-            <div style={{ margin: '16px 0', fontSize: '18px' }}>
-              <div>Best Lap: {bestLap ? (bestLap / 1000).toFixed(2) + 's' : '--'}</div>
-              <div style={{ marginTop: '8px' }}>Total Drift Score: {driftScore} pts</div>
-            </div>
-
-            <button style={styles.startBtn} onClick={handleRestart}>
-              RACE AGAIN
+            <button style={styles.startBtn} onClick={handleStartFreeRoam}>
+              ENTER MANHATTAN (FREE ROAM)
             </button>
           </div>
         </div>
@@ -296,9 +241,11 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(0, 240, 255, 0.3)',
     boxShadow: '0 0 30px rgba(0, 240, 255, 0.2)',
     borderRadius: '12px',
-    padding: '36px 48px',
+    padding: '32px 40px',
     textAlign: 'center',
-    maxWidth: '480px',
+    maxWidth: '520px',
+    maxHeight: '90vh',
+    overflowY: 'auto',
     width: '90%',
   },
   title: {
@@ -314,10 +261,10 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '0.2em',
     color: '#00f0ff',
     marginTop: '6px',
-    marginBottom: '24px',
+    marginBottom: '20px',
   },
   section: {
-    marginBottom: '20px',
+    marginBottom: '18px',
     textAlign: 'left',
   },
   label: {
@@ -330,7 +277,9 @@ const styles: Record<string, React.CSSProperties> = {
   carList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: '6px',
+    maxHeight: '220px',
+    overflowY: 'auto',
   },
   carButton: {
     background: 'rgba(255,255,255,0.05)',
@@ -339,7 +288,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '6px',
     padding: '10px 14px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '13px',
     textAlign: 'left',
     transition: 'all 0.15s ease',
   },
@@ -367,11 +316,5 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     marginTop: '12px',
     boxShadow: '0 0 20px rgba(0, 240, 255, 0.4)',
-  },
-  countdown: {
-    fontSize: '120px',
-    fontWeight: 900,
-    color: '#00f0ff',
-    textShadow: '0 0 30px #00f0ff',
   },
 };

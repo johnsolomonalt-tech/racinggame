@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import { RigidBody, CuboidCollider } from '@react-three/rapier';
 import { vehicleState } from './vehicleState';
 import { useGame } from '../state/store';
-
 import { trackRuntime } from './trackRuntime';
 
 interface TileMeta {
@@ -22,16 +21,19 @@ interface CityManifest {
 
 function CityTile({ id }: { id: string }) {
   const { scene } = useGLTF(`/city/${id}.glb`, '/draco/');
-  return <primitive object={scene} />;
+  return (
+    <RigidBody type="fixed" colliders="trimesh">
+      <primitive object={scene} />
+    </RigidBody>
+  );
 }
 
 export default function City() {
   const [manifest, setManifest] = useState<CityManifest | null>(null);
-  const [footprints, setFootprints] = useState<number[][][] | null>(null);
   const [activeTileIds, setActiveTileIds] = useState<string[]>([]);
   const setGame = useGame((s) => s.set);
 
-  // Fetch manifest and footprints
+  // Fetch manifest
   useEffect(() => {
     fetch('/city/manifest.json')
       .then((r) => r.json())
@@ -43,26 +45,18 @@ export default function City() {
           .filter((t) => {
             const dx = t.center[0] - sx;
             const dz = t.center[1] - sz;
-            return Math.sqrt(dx * dx + dz * dz) <= 600;
+            return Math.sqrt(dx * dx + dz * dz) <= 650;
           })
           .map((t) => t.id);
         setActiveTileIds(initial);
-        setGame({ loadProgress: 0.5 });
-      })
-      .catch((err) => console.error('Failed to load city manifest:', err));
-
-    fetch('/city/footprints.json')
-      .then((r) => r.json())
-      .then((data: number[][][]) => {
-        setFootprints(data);
         setGame({ loadProgress: 1.0 });
       })
-      .catch((err) => console.error('Failed to load footprints:', err));
+      .catch((err) => console.error('Failed to load city manifest:', err));
   }, [setGame]);
 
-  // Dynamic distance-based tile streaming & LOD swapping (Section 2)
+  // Dynamic distance-based tile streaming & LOD swapping
   const lastUpdatePos = React.useRef(new THREE.Vector2(-9999, -9999));
-  const VISIBILITY_RADIUS = 600; // Load tiles within 600m
+  const VISIBILITY_RADIUS = 650; // Load tiles within 650m for open-world exploration
 
   useFrame(() => {
     if (!manifest) return;
@@ -85,31 +79,6 @@ export default function City() {
     }
   });
 
-  // Nearby building collision boxes generated dynamically from footprints
-  const activeColliders = useMemo(() => {
-    if (!footprints) return [];
-    // Approximate footprint polygons as bounding cuboid colliders
-    return footprints.map((poly) => {
-      let minX = Infinity, maxX = -Infinity;
-      let minZ = Infinity, maxZ = -Infinity;
-      for (const [x, z] of poly) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (z < minZ) minZ = z;
-        if (z > maxZ) maxZ = z;
-      }
-      const hx = (maxX - minX) / 2;
-      const hz = (maxZ - minZ) / 2;
-      const cx = (minX + maxX) / 2;
-      const cz = (minZ + maxZ) / 2;
-      const height = 45; // average building height
-      return {
-        halfExtents: [hx, height / 2, hz] as [number, number, number],
-        position: [cx, height / 2, cz] as [number, number, number],
-      };
-    });
-  }, [footprints]);
-
   return (
     <group>
       {/* Wet asphalt ground plane receiving dynamic vehicle shadows */}
@@ -123,23 +92,12 @@ export default function City() {
         />
       </mesh>
 
-      {/* Ground Physical Collider */}
+      {/* Global Ground Physical Collider (Solid everywhere across the open world) */}
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider args={[2500, 1, 2500]} position={[0, -1, 0]} friction={0.9} restitution={0.0} />
-
-        {/* Building Colliders */}
-        {activeColliders.map((b, idx) => (
-          <CuboidCollider
-            key={idx}
-            args={b.halfExtents}
-            position={b.position}
-            friction={0.2}
-            restitution={0.1}
-          />
-        ))}
       </RigidBody>
 
-      {/* Streamed 3D GLB City Tiles with per-tile Suspense */}
+      {/* Streamed 3D GLB City Tiles with Physical Trimesh Colliders (100% Solid Buildings, Zero Phantom Boxes) */}
       {activeTileIds.map((id) => (
         <React.Suspense key={id} fallback={null}>
           <CityTile id={id} />

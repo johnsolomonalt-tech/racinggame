@@ -171,15 +171,23 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
       upsideDownTimer.current = 0;
     }
 
-    if (t.y < config.killY) {
+    if (t.y < -15) {
       vehicleState.respawn = {
-        position: new THREE.Vector3(trackRuntime.track.start.x, trackRuntime.track.start.y, trackRuntime.track.start.z),
+        position: new THREE.Vector3(trackRuntime.track.start.x, 1.2, trackRuntime.track.start.z),
         yaw: trackRuntime.track.start.yaw,
       };
     }
 
     // 4. Input handling
     const input = readInput();
+
+    // Instant player reset / unflip on the road with R key
+    if (input.respawn) {
+      vehicleState.respawn = {
+        position: new THREE.Vector3(t.x, 0.8, t.z),
+        yaw: Math.atan2(fwd.x, fwd.z),
+      };
+    }
 
     // Speed-dependent steering angle (tight low-speed radius, stable high-speed taper)
     const speedRatio = THREE.MathUtils.clamp(Math.abs(speedKmh) / config.steerFalloffKmh, 0, 1);
@@ -270,23 +278,26 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
       }
       controller.setWheelBrake(i, brakeForce);
 
-      // Drift physics (tweak rear friction)
+      // Drift physics & Aerodynamic High-Speed Grip (Authentic grip without suspension collapse)
+      const speedRatio = Math.min(2.0, Math.abs(speedKmh) / 140);
+      const aeroGrip = 1 + (config.downforceK * 0.12) * speedRatio;
+
       if (isRear) {
         if (input.handbrake) {
           controller.setWheelFrictionSlip(i, config.frictionSlipRear * config.handbrakeRearSlip);
           controller.setWheelSideFrictionStiffness(i, config.sideFrictionRear * config.handbrakeRearSide);
         } else {
-          controller.setWheelFrictionSlip(i, config.frictionSlipRear);
-          controller.setWheelSideFrictionStiffness(i, config.sideFrictionRear);
+          controller.setWheelFrictionSlip(i, config.frictionSlipRear * aeroGrip);
+          controller.setWheelSideFrictionStiffness(i, config.sideFrictionRear * aeroGrip);
         }
+      } else {
+        controller.setWheelFrictionSlip(i, config.frictionSlipFront * aeroGrip);
+        controller.setWheelSideFrictionStiffness(i, config.sideFrictionFront * aeroGrip);
       }
     }
 
-    // 6. Aerodynamic Downforce & Drag
+    // 6. Aerodynamic Drag (Horizontal air resistance opposing velocity)
     const speedSq = speedMs * speedMs;
-    const downforce = config.downforceK * speedSq * 9.81 * (config.mass / 1200);
-    body.applyImpulse({ x: 0, y: -downforce * dt, z: 0 }, true);
-
     const drag = config.dragK * speedSq * Math.sign(speedMs);
     body.applyImpulse({ x: -fwd.x * drag * dt, y: 0, z: -fwd.z * drag * dt }, true);
 
@@ -302,7 +313,7 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
     vehicleState.drift = THREE.MathUtils.damp(vehicleState.drift, driftIntensity, 6.0, dt);
 
     const store = useGame.getState();
-    if (store.phase === 'racing') {
+    if (store.phase === 'racing' || store.phase === 'roam') {
       if (driftIntensity > 0.1) {
         driftGraceTimer.current = config.driftBankDelay;
         const pts = Math.round(driftIntensity * (Math.abs(speedKmh) / 100) * config.driftPointsRate * dt);
@@ -362,6 +373,8 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
       ref={chassisRef}
       colliders={false}
       type="dynamic"
+      ccd={true}
+      canSleep={false}
       mass={config.mass}
       linearDamping={config.linearDamping}
       angularDamping={config.angularDamping}

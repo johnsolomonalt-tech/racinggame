@@ -47,9 +47,10 @@ function onKey(e: KeyboardEvent, down: boolean) {
     e.preventDefault();
     return;
   }
-  if (!down || e.repeat) return;
   if (e.code === 'KeyR' && controlState.enabled) respawnAtCheckpoint();
   if (e.code === 'KeyM') audioEngine.toggleMute();
+  if (e.code === 'KeyG') window.dispatchEvent(new CustomEvent('toggle-garage'));
+  if (e.code === 'KeyT') window.dispatchEvent(new CustomEvent('toggle-fast-travel'));
   if (e.code === 'KeyC') {
     const i = cameraModes.indexOf(controlState.cameraMode);
     controlState.cameraMode = cameraModes[(i + 1) % cameraModes.length];

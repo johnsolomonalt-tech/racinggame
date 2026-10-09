@@ -71,19 +71,40 @@ export function getStartTransform(): { position: THREE.Vector3; yaw: number } {
   return { position: new THREE.Vector3(s.x, s.y, s.z), yaw: s.yaw };
 }
 
+/** Open-world iconic NYC spawn locations. */
+export const OPEN_WORLD_SPAWNS = [
+  { id: 'times-square', name: 'Times Square (Broadway & 45th)', pos: [-50, 1.2, 120], yaw: 0 },
+  { id: '8th-ave', name: '8th Avenue Strip', pos: [-534, 1.2, 404], yaw: -2.1 },
+  { id: 'central-park', name: 'Central Park South (59th St)', pos: [100, 1.2, -450], yaw: 1.57 },
+  { id: 'broadway-42', name: 'Broadway & 42nd St Intersection', pos: [-120, 1.2, 280], yaw: -0.5 },
+];
+
+export function teleportTo(spawnIndex: number) {
+  const s = OPEN_WORLD_SPAWNS[spawnIndex] || OPEN_WORLD_SPAWNS[0];
+  vehicleState.respawn = {
+    position: new THREE.Vector3(s.pos[0], s.pos[1], s.pos[2]),
+    yaw: s.yaw,
+  };
+}
+
+/** Immediate unflip right on the road where the car currently is. */
+export function unflipOrResetCar() {
+  const p = vehicleState.position;
+  const q = vehicleState.quaternion;
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+  vehicleState.respawn = {
+    position: new THREE.Vector3(p.x, 0.8, p.z),
+    yaw: Math.atan2(fwd.x, fwd.z),
+  };
+}
+
 /** Request a respawn at the start line. */
 export function respawnAtStart() {
   vehicleState.respawn = getStartTransform();
 }
 
-/** Request a respawn at the last checkpoint (fallback: start). */
+/** Request a respawn at the last checkpoint (fallback: unflip/reset). */
 export function respawnAtCheckpoint() {
-  const cp = trackRuntime.lastCheckpoint;
-  if (cp) {
-    const position = toVec3(cp.position);
-    position.y = Math.max(position.y, trackRuntime.track.start.y);
-    vehicleState.respawn = { position, yaw: cp.yaw };
-  } else {
-    respawnAtStart();
-  }
+  unflipOrResetCar();
 }
+
