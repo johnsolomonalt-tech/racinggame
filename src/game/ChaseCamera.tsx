@@ -47,6 +47,22 @@ export default function ChaseCamera() {
       lookOffset = new THREE.Vector3(0, 0.85, -6.0);
     }
 
+    // Dynamic corner apex look-ahead & drift camera framing
+    const currentSteer = (window as any).__VEHICLE_DEBUG__?.steer
+      ? parseFloat((window as any).__VEHICLE_DEBUG__.steer)
+      : 0;
+
+    if (mode === 'chase' || mode === 'far') {
+      // Look into the apex of the turn for intuitive cornering
+      lookOffset.x += -currentSteer * 2.2;
+      // Drift swing: swing camera to frame counter-steering drifts
+      offset.x += -currentSteer * 0.7 * vehicleState.drift;
+      // High-speed camera pullback at extreme speed
+      if (speedKmh > 160) {
+        offset.z += Math.min(1.2, (speedKmh - 160) * 0.015);
+      }
+    }
+
     // World target position
     const worldOffset = offset.clone().applyQuaternion(carQuat);
     const targetCamPos = carPos.clone().add(worldOffset);

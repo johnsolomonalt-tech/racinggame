@@ -14,6 +14,7 @@ import { useGame } from '../state/store';
 import { useResolvedCar, type CarManifestEntry } from './carModel';
 import { trackRuntime } from './trackRuntime';
 import { audioEngine } from './audio';
+import { ExhaustBackfire } from './VisualEffects';
 
 interface VehicleProps {
   manifestEntry?: CarManifestEntry | null;
@@ -220,6 +221,7 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
       if (gearIdx < maxGears - 1 && rpm > config.upshiftRpm && shiftTimer.current <= 0) {
         currentGear.current = (gearIdx + 2);
         shiftTimer.current = config.shiftTime;
+        audioEngine.playBlowOffValve();
       } else if (gearIdx > 0 && rpm < config.downshiftRpm && shiftTimer.current <= 0) {
         currentGear.current = (gearIdx);
         shiftTimer.current = config.shiftTime;
@@ -236,6 +238,9 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
 
     // Throttle smoothing (prevents instantaneous torque shock on frame 0)
     const targetThrottle = input.throttle;
+    if (currentThrottle.current > 0.75 && targetThrottle < 0.2 && currentRpm.current > 0.7) {
+      audioEngine.playBackfirePop();
+    }
     currentThrottle.current = THREE.MathUtils.damp(currentThrottle.current, targetThrottle, 5.0, dt);
 
     // Apply Drive Forces & Braking
@@ -294,34 +299,50 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
       const speedRatio = Math.min(2.0, Math.abs(speedKmh) / 140);
       const aeroGrip = 1 + (config.downforceK * 0.12) * speedRatio;
 
+      // Dynamic lateral slip roll-off: under high lateral slip (spins, J-turns, heavy slides),
+      // tires transition into kinetic sliding rather than grabbing and overturning the car
+      const latSpeed = Math.abs(lateralMs);
+      const slideSlipDecay = latSpeed > 3.0 ? Math.max(0.40, 1.0 - (latSpeed - 3.0) * 0.05) : 1.0;
+
       if (isRear) {
         if (input.handbrake) {
           controller.setWheelFrictionSlip(i, config.frictionSlipRear * config.handbrakeRearSlip);
           controller.setWheelSideFrictionStiffness(i, config.sideFrictionRear * config.handbrakeRearSide);
         } else {
-          controller.setWheelFrictionSlip(i, config.frictionSlipRear * aeroGrip);
-          controller.setWheelSideFrictionStiffness(i, config.sideFrictionRear * aeroGrip);
+          controller.setWheelFrictionSlip(i, config.frictionSlipRear * aeroGrip * slideSlipDecay);
+          controller.setWheelSideFrictionStiffness(i, config.sideFrictionRear * aeroGrip * slideSlipDecay);
         }
       } else {
-        controller.setWheelFrictionSlip(i, config.frictionSlipFront * aeroGrip);
-        controller.setWheelSideFrictionStiffness(i, config.sideFrictionFront * aeroGrip);
+        controller.setWheelFrictionSlip(i, config.frictionSlipFront * aeroGrip * slideSlipDecay);
+        controller.setWheelSideFrictionStiffness(i, config.sideFrictionFront * aeroGrip * slideSlipDecay);
       }
     }
 
-    // 6. Aerodynamic Drag (Horizontal air resistance opposing velocity)
+    // 6. Aerodynamic Drag & Multi-Axis Stability Augmentation (Pitch, Roll, and Vault Guard)
     const speedSq = speedMs * speedMs;
     const drag = config.dragK * speedSq * Math.sign(speedMs);
     body.applyImpulse({ x: -fwd.x * drag * dt, y: 0, z: -fwd.z * drag * dt }, true);
 
-    // Active anti-wheelie pitch stabilization: keeps all 4 wheels firmly planted on tarmac
-    const pitchAngle = -Math.asin(THREE.MathUtils.clamp(fwd.y, -1, 1));
-    if (pitchAngle > 0.02) {
-      const pitchRestore = config.mass * 14.0 * (pitchAngle - 0.02);
-      body.applyTorqueImpulse({
-        x: -right.x * pitchRestore * dt,
-        y: -right.y * pitchRestore * dt,
-        z: -right.z * pitchRestore * dt,
-      }, true);
+    // Active Pitch & Roll Stabilization (Restores chassis to horizontal plane)
+    // 1. Roll stabilization (torque along chassis forward vector)
+    const rollTilt = right.y;
+    if (Math.abs(rollTilt) > 0.02) {
+      const tauRoll = config.mass * 8.0 * (rollTilt - Math.sign(rollTilt) * 0.02);
+      const rollImpulse = fwd.clone().multiplyScalar(tauRoll * dt);
+      body.applyTorqueImpulse({ x: rollImpulse.x, y: rollImpulse.y, z: rollImpulse.z }, true);
+    }
+
+    // 2. Pitch stabilization (torque along chassis right vector)
+    const pitchTilt = fwd.y;
+    if (Math.abs(pitchTilt) > 0.02) {
+      const tauPitch = -config.mass * 8.0 * (pitchTilt - Math.sign(pitchTilt) * 0.02);
+      const pitchImpulse = right.clone().multiplyScalar(tauPitch * dt);
+      body.applyTorqueImpulse({ x: pitchImpulse.x, y: pitchImpulse.y, z: pitchImpulse.z }, true);
+    }
+
+    // 3. Ground-Strike Anti-Vault Guard: if vehicle is near ground and vertical velocity spikes upward, clamp it
+    if (t.y < 1.6 && v.y > 1.8) {
+      body.setLinvel({ x: v.x, y: 0.2, z: v.z }, true);
     }
 
     // 7. Drift scoring calculation
@@ -389,6 +410,13 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
       steer: currentSteer.current.toFixed(2),
       carId: manifestEntry ? manifestEntry.id : 'procedural-gt',
     };
+    (window as any).__VEHICLE_RAW__ = {
+      upY: up.y,
+      rightY: right.y,
+      fwdY: fwd.y,
+      velY: v.y,
+      angvel: body.angvel(),
+    };
   });
 
   return (
@@ -419,12 +447,12 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
         }
       }}
     >
-      {/* Chassis Physical Cuboid Collider with Ground Clearance (will NEVER scrape the road) */}
+      {/* Chassis Physical Cuboid Collider with Ground Clearance (will NEVER scrape the road or trip) */}
       <CuboidCollider
-        args={car.hitbox.halfExtents}
-        position={car.hitbox.center}
-        friction={config.chassisFriction}
-        restitution={config.chassisRestitution}
+        args={[car.hitbox.halfExtents[0] * 0.94, car.hitbox.halfExtents[1] * 0.90, car.hitbox.halfExtents[2] * 0.94]}
+        position={[car.hitbox.center[0], car.hitbox.center[1] + 0.08, car.hitbox.center[2]]}
+        friction={0.01}
+        restitution={0.0}
       />
 
       {/* Car Visual Mesh */}
@@ -460,6 +488,9 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
         <pointLight position={[-car.hitbox.halfExtents[0] * 0.7, 0, 0.35]} intensity={1.2} distance={8} color="#ff0028" decay={2.0} />
         <pointLight position={[car.hitbox.halfExtents[0] * 0.7, 0, 0.35]} intensity={1.2} distance={8} color="#ff0028" decay={2.0} />
       </group>
+
+      {/* Exhaust Backfire Flame Bursts & Light Flash */}
+      <ExhaustBackfire />
 
       {/* Visual Wheels (only rendered for vehicles with separate wheel sub-meshes) */}
       {car.hasSeparateWheels && (

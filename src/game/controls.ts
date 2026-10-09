@@ -51,7 +51,10 @@ function onKey(e: KeyboardEvent, down: boolean) {
   if (!down) return;
 
   if (e.code === 'KeyR' && controlState.enabled) respawnAtCheckpoint();
-  if (e.code === 'KeyM') audioEngine.toggleMute();
+  if (e.code === 'KeyM') {
+    audioEngine.toggleMute();
+    window.dispatchEvent(new CustomEvent('toggle-mute'));
+  }
   if (e.code === 'KeyG') window.dispatchEvent(new CustomEvent('toggle-garage'));
   if (e.code === 'KeyT') window.dispatchEvent(new CustomEvent('toggle-fast-travel'));
   if (e.code === 'KeyC') {

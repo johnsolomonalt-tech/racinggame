@@ -225,12 +225,12 @@ export const CAR_PROFILES: Record<string, Partial<CarPhysicsProfile>> = {
 /** Default base configuration */
 export const carConfig = {
   mass: 1200,
-  comOffsetY: -0.32,
-  inertiaScale: 1.2,
+  comOffsetY: -0.38,
+  inertiaScale: 1.5,
   linearDamping: 0.05,
-  angularDamping: 1.6,
-  chassisFriction: 0.1,
-  chassisRestitution: 0.02,
+  angularDamping: 2.8,
+  chassisFriction: 0.01,
+  chassisRestitution: 0.0,
 
   topSpeedKmh: 280,
   reverseMaxKmh: 45,

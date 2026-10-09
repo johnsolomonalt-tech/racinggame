@@ -10,6 +10,7 @@ import ChaseCamera from './game/ChaseCamera';
 import Lights from './game/Lights';
 import Effects from './game/Effects';
 import Landmarks from './game/Landmarks';
+import VisualEffects from './game/VisualEffects';
 import HUD from './ui/HUD';
 import { initControls, controlState } from './game/controls';
 import { useGame } from './state/store';
@@ -137,6 +138,7 @@ export default function App() {
           </Physics>
 
           <Landmarks />
+          <VisualEffects />
           <ChaseCamera />
           <Lights />
           <Effects enableSSR={enableSSR} />

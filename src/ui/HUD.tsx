@@ -4,6 +4,7 @@ import { vehicleState } from '../game/vehicleState';
 import { useGame } from '../state/store';
 import { OPEN_WORLD_SPAWNS, teleportTo } from '../game/trackRuntime';
 import type { CarManifestEntry } from '../game/carModel';
+import { audioEngine } from '../game/audio';
 import './hud.css';
 
 interface HUDProps {
@@ -20,6 +21,7 @@ export default function HUD({ cars, selectedCarIndex, onSelectCar }: HUDProps) {
   // Modals state
   const [garageOpen, setGarageOpen] = useState(false);
   const [fastTravelOpen, setFastTravelOpen] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
 
   // Direct DOM refs for 60fps zero-react-render updates
   const speedRef = useRef<HTMLDivElement>(null);
@@ -33,13 +35,16 @@ export default function HUD({ cars, selectedCarIndex, onSelectCar }: HUDProps) {
   useEffect(() => {
     const handleToggleGarage = () => setGarageOpen((prev) => !prev);
     const handleToggleFastTravel = () => setFastTravelOpen((prev) => !prev);
+    const handleToggleMute = () => setIsMuted(audioEngine.getMuted());
 
     window.addEventListener('toggle-garage', handleToggleGarage);
     window.addEventListener('toggle-fast-travel', handleToggleFastTravel);
+    window.addEventListener('toggle-mute', handleToggleMute);
 
     return () => {
       window.removeEventListener('toggle-garage', handleToggleGarage);
       window.removeEventListener('toggle-fast-travel', handleToggleFastTravel);
+      window.removeEventListener('toggle-mute', handleToggleMute);
     };
   }, []);
 
@@ -68,9 +73,13 @@ export default function HUD({ cars, selectedCarIndex, onSelectCar }: HUDProps) {
         gearRef.current.textContent = String(vehicleState.gear);
       }
 
-      // 4. Tachometer / RPM bar
+      // 4. Tachometer / RPM bar (intense redline flash)
       if (rpmBarRef.current) {
         rpmBarRef.current.style.transform = `scaleX(${Math.min(1, Math.max(0, vehicleState.rpm))})`;
+        rpmBarRef.current.style.background =
+          vehicleState.rpm > 0.88
+            ? '#ff0033'
+            : 'linear-gradient(90deg, #00f0ff, #ff0077)';
       }
 
       // 5. GPS Street Location & Compass Heading
@@ -169,6 +178,15 @@ export default function HUD({ cars, selectedCarIndex, onSelectCar }: HUDProps) {
           }}
         >
           🗽 MAP / TRAVEL <span className="key-hint">[T]</span>
+        </button>
+        <button
+          className="hud-action-btn"
+          onClick={() => {
+            const m = audioEngine.toggleMute();
+            setIsMuted(m);
+          }}
+        >
+          {isMuted ? '🔇 MUTED' : '🔊 SOUND'} <span className="key-hint">[M]</span>
         </button>
       </div>
 

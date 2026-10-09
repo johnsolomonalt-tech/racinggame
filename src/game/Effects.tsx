@@ -63,13 +63,16 @@ function createCinematicLUT(size = 16): THREE.Data3DTexture {
 }
 
 export default function Effects({ enableSSR = true }: EffectsProps) {
+  const lutTexture = useMemo(() => createCinematicLUT(16), []);
+
   return (
     <EffectComposer multisampling={0} enableNormalPass={enableSSR}>
       <ToneMapping mode={THREE.ACESFilmicToneMapping} />
+      <LUT lut={lutTexture} />
       <Bloom
-        luminanceThreshold={1.2}
-        luminanceSmoothing={0.25}
-        intensity={0.5}
+        luminanceThreshold={1.1}
+        luminanceSmoothing={0.3}
+        intensity={0.65}
         mipmapBlur
       />
       {enableSSR ? (
