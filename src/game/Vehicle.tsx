@@ -35,6 +35,7 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
   const vehicleControllerRef = useRef<any>(null);
 
   // Dynamic driving state
+  const currentThrottle = useRef(0);
   const currentSteer = useRef(0);
   const currentGear = useRef<number | 'R' | 'N'>(1);
   const currentRpm = useRef(0.2);
@@ -83,7 +84,7 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
       controller.setWheelMaxSuspensionTravel(i, config.maxSuspensionTravel);
       controller.setWheelSuspensionCompression(i, config.suspensionCompression);
       controller.setWheelSuspensionRelaxation(i, config.suspensionRelaxation);
-      controller.setWheelMaxSuspensionForce(i, config.maxSuspensionForce ?? Math.max(120000, config.mass * 35));
+      controller.setWheelMaxSuspensionForce(i, config.maxSuspensionForce ?? Math.max(20000, config.mass * 18));
       controller.setWheelFrictionSlip(i, isFront ? config.frictionSlipFront : config.frictionSlipRear);
       controller.setWheelSideFrictionStiffness(i, isFront ? config.sideFrictionFront : config.sideFrictionRear);
     });
@@ -173,7 +174,7 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
 
     if (t.y < -15) {
       vehicleState.respawn = {
-        position: new THREE.Vector3(trackRuntime.track.start.x, 1.2, trackRuntime.track.start.z),
+        position: new THREE.Vector3(trackRuntime.track.start.x, 0.08, trackRuntime.track.start.z),
         yaw: trackRuntime.track.start.yaw,
       };
     }
@@ -184,7 +185,7 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
     // Instant player reset / unflip on the road with R key
     if (input.respawn) {
       vehicleState.respawn = {
-        position: new THREE.Vector3(t.x, 0.8, t.z),
+        position: new THREE.Vector3(t.x, 0.08, t.z),
         yaw: Math.atan2(fwd.x, fwd.z),
       };
     }
@@ -233,11 +234,18 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
     vehicleState.gear = currentGear.current;
     vehicleState.rpm = currentRpm.current;
 
+    // Throttle smoothing (prevents instantaneous torque shock on frame 0)
+    const targetThrottle = input.throttle;
+    currentThrottle.current = THREE.MathUtils.damp(currentThrottle.current, targetThrottle, 5.0, dt);
+
     // Apply Drive Forces & Braking
     const isShifting = shiftTimer.current > 0;
     const gearIdx = typeof currentGear.current === 'number' ? currentGear.current - 1 : 0;
     const torqueMult = currentGear.current === 'R' ? 0.7 : (config.gearTorque[gearIdx] ?? 0.5);
-    const totalEngineForce = isShifting ? 0 : config.engineForce * torqueMult * input.throttle;
+
+    // Progressive launch curve at low speed eliminates wheelie torque snap while preserving crisp takeoff
+    const launchScale = THREE.MathUtils.clamp(Math.abs(speedKmh) / 28, 0.40, 1.0);
+    const totalEngineForce = isShifting ? 0 : config.engineForce * torqueMult * currentThrottle.current * launchScale;
 
     const isBraking = input.brake > 0 && speedKmh > 2;
     const isReversing = input.brake > 0 && speedKmh <= 2;
@@ -257,8 +265,12 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
       // Throttle application
       if (isDriven) {
         if (currentGear.current === 'R' && isReversing) {
-          controller.setWheelEngineForce(i, -config.reverseForce / numDriven);
-        } else if (input.throttle > 0 && speedKmh < config.topSpeedKmh) {
+          if (Math.abs(speedKmh) < config.reverseMaxKmh) {
+            controller.setWheelEngineForce(i, -config.reverseForce / numDriven);
+          } else {
+            controller.setWheelEngineForce(i, 0);
+          }
+        } else if (currentThrottle.current > 0.01 && speedKmh < config.topSpeedKmh) {
           controller.setWheelEngineForce(i, totalEngineForce / numDriven);
         } else {
           controller.setWheelEngineForce(i, 0);
@@ -300,6 +312,17 @@ export default function Vehicle({ manifestEntry = null }: VehicleProps) {
     const speedSq = speedMs * speedMs;
     const drag = config.dragK * speedSq * Math.sign(speedMs);
     body.applyImpulse({ x: -fwd.x * drag * dt, y: 0, z: -fwd.z * drag * dt }, true);
+
+    // Active anti-wheelie pitch stabilization: keeps all 4 wheels firmly planted on tarmac
+    const pitchAngle = -Math.asin(THREE.MathUtils.clamp(fwd.y, -1, 1));
+    if (pitchAngle > 0.02) {
+      const pitchRestore = config.mass * 14.0 * (pitchAngle - 0.02);
+      body.applyTorqueImpulse({
+        x: -right.x * pitchRestore * dt,
+        y: -right.y * pitchRestore * dt,
+        z: -right.z * pitchRestore * dt,
+      }, true);
+    }
 
     // 7. Drift scoring calculation
     const isDrifting =

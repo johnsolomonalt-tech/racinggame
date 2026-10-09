@@ -29,7 +29,7 @@ export const FALLBACK_TRACK: TrackDef = {
   gateRadius: 18,
   start: {
     x: -534.56,
-    y: 1.2,
+    y: 0.08,
     z: 404.4,
     yaw: 0.54,
   },
@@ -56,7 +56,15 @@ export const trackRuntime: {
 };
 
 export function setTrack(track: TrackDef) {
-  trackRuntime.track = track;
+  trackRuntime.track = {
+    ...FALLBACK_TRACK,
+    ...track,
+    start: {
+      ...FALLBACK_TRACK.start,
+      ...(track.start || {}),
+      y: 0.05,
+    },
+  };
 }
 
 function toVec3(p: SpawnTransform['position']): THREE.Vector3 {
@@ -73,10 +81,10 @@ export function getStartTransform(): { position: THREE.Vector3; yaw: number } {
 
 /** Open-world iconic NYC spawn locations. */
 export const OPEN_WORLD_SPAWNS = [
-  { id: 'times-square', name: 'Times Square (Broadway & 45th)', pos: [-50, 1.2, 120], yaw: 0 },
-  { id: '8th-ave', name: '8th Avenue Strip', pos: [-534, 1.2, 404], yaw: -2.1 },
-  { id: 'central-park', name: 'Central Park South (59th St)', pos: [100, 1.2, -450], yaw: 1.57 },
-  { id: 'broadway-42', name: 'Broadway & 42nd St Intersection', pos: [-120, 1.2, 280], yaw: -0.5 },
+  { id: 'times-square', name: 'Times Square (Broadway & 45th)', pos: [-50, 0.08, 120], yaw: 0 },
+  { id: '8th-ave', name: '8th Avenue Strip', pos: [-534, 0.08, 404], yaw: -2.1 },
+  { id: 'central-park', name: 'Central Park South (59th St)', pos: [100, 0.08, -450], yaw: 1.57 },
+  { id: 'broadway-42', name: 'Broadway & 42nd St Intersection', pos: [-120, 0.08, 280], yaw: -0.5 },
 ];
 
 export function teleportTo(spawnIndex: number) {
@@ -93,7 +101,7 @@ export function unflipOrResetCar() {
   const q = vehicleState.quaternion;
   const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
   vehicleState.respawn = {
-    position: new THREE.Vector3(p.x, 0.8, p.z),
+    position: new THREE.Vector3(p.x, 0.08, p.z),
     yaw: Math.atan2(fwd.x, fwd.z),
   };
 }

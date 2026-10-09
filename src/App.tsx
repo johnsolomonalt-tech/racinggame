@@ -9,6 +9,7 @@ import Vehicle from './game/Vehicle';
 import ChaseCamera from './game/ChaseCamera';
 import Lights from './game/Lights';
 import Effects from './game/Effects';
+import Landmarks from './game/Landmarks';
 import HUD from './ui/HUD';
 import { initControls, controlState } from './game/controls';
 import { useGame } from './state/store';
@@ -101,7 +102,6 @@ export default function App() {
 
   const handleStartFreeRoam = () => {
     audioEngine.init();
-    respawnAtStart();
     setGame({ phase: 'roam' });
     controlState.enabled = true;
     controlState.forceHandbrake = false;
@@ -136,6 +136,7 @@ export default function App() {
             <Vehicle key={currentCar ? currentCar.id : 'procedural'} manifestEntry={currentCar} />
           </Physics>
 
+          <Landmarks />
           <ChaseCamera />
           <Lights />
           <Effects enableSSR={enableSSR} />

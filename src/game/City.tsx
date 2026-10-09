@@ -21,10 +21,38 @@ interface CityManifest {
 
 function CityTile({ id }: { id: string }) {
   const { scene } = useGLTF(`/city/${id}.glb`, '/draco/');
+
+  // Extract building meshes (facades & roofs) for solid trimesh collision.
+  // Road surfaces ('ground') and decals/markings ('detail') are excluded so the vehicle
+  // glides smoothly on the global ground collider without catching tile polygon seams.
+  const buildingGroup = React.useMemo(() => {
+    const group = new THREE.Group();
+    scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        const mat = mesh.material;
+        const matName = (Array.isArray(mat) ? mat[0]?.name : mat?.name) || '';
+        if (matName === 'facade' || matName === 'roof' || mesh.name.includes('facade') || mesh.name.includes('roof')) {
+          const clone = new THREE.Mesh(mesh.geometry, mesh.material);
+          clone.position.copy(mesh.position);
+          clone.quaternion.copy(mesh.quaternion);
+          clone.scale.copy(mesh.scale);
+          group.add(clone);
+        }
+      }
+    });
+    return group.children.length > 0 ? group : null;
+  }, [scene]);
+
   return (
-    <RigidBody type="fixed" colliders="trimesh">
+    <group>
       <primitive object={scene} />
-    </RigidBody>
+      {buildingGroup && (
+        <RigidBody type="fixed" colliders="trimesh" friction={0.1} restitution={0.0}>
+          <primitive object={buildingGroup} />
+        </RigidBody>
+      )}
+    </group>
   );
 }
 

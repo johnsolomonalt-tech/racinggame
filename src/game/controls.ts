@@ -47,6 +47,9 @@ function onKey(e: KeyboardEvent, down: boolean) {
     e.preventDefault();
     return;
   }
+  // Only trigger action commands on keydown, not on keyup
+  if (!down) return;
+
   if (e.code === 'KeyR' && controlState.enabled) respawnAtCheckpoint();
   if (e.code === 'KeyM') audioEngine.toggleMute();
   if (e.code === 'KeyG') window.dispatchEvent(new CustomEvent('toggle-garage'));
